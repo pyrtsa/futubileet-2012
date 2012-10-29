@@ -1,0 +1,188 @@
+<!doctype html>
+<!--[if lt IE 7]> <html class="no-js ie6" lang="en"> <![endif]-->
+<!--[if IE 7]>    <html class="no-js ie7" lang="en"> <![endif]-->
+<!--[if IE 8]>    <html class="no-js ie8" lang="en"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en"> <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <title>Arrival Times – Futubileet 2012</title>
+  <meta name="description" content=""> <!-- TODO: add description -->
+  <meta name="author" content="Pyry Jahkola">
+  <!-- Mobile viewport optimized: j.mp/bplateviewport -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- TODO: Create /favicon.ico & /apple-touch-icon.png & delete these refs -->
+  <link rel="shortcut icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/style.css"> <!-- CSS: implied media="all" -->
+  <!-- TODO: <link rel="stylesheet" media="handheld" href="css/handheld.css">-->
+  <!-- <script src="js/libs/modernizr-1.7.min.js"></script> -->
+</head>
+
+<style>
+  body { background: #fcfcfc }
+</style>
+
+<body>
+  <div id="container">
+    <header>
+
+    </header>
+    <div id="main" role="main">
+      <div id="chart"></div>
+    </div>
+    <footer>
+
+    </footer>
+  </div> <!--! end of #container -->
+
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.js"></script>
+  <script>window.jQuery || document.write(
+              "<script src='js/libs/jquery-1.8.2.min.js'>\x3C/script>")</script>
+  <script src="js/libs/underscore-min.js"></script>
+  <script src="js/libs/d3.v2.js"></script>
+  <!-- scripts -->
+  <!-- <script src="js/plugins.js"></script> -->
+  <!-- <script src="js/script.js"></script> -->
+  <script>
+    function magnitude(x) {
+      var m = Math
+      return x === 0 ? 0 : m.floor(m.log(m.abs(x)) / m.log(10))
+    }
+    function outFromTheMiddle(xs) {
+      var n = xs.length, m = Math.floor(n / 2), r = [xs[m]]
+      for (var i = 1; i < n; i++)
+        r.push(xs[i % 2 ? m - Math.floor((i + 1) / 2) : m + Math.floor(i / 2)])
+      return r
+    }
+    function simplestValueBetween(lo, hi, bases) {
+      bases = bases || [10, 5, 2]
+      var m = Math
+      var u = m.pow(10, -magnitude(hi - lo))
+      var js = outFromTheMiddle(_.range(m.ceil(lo * u), 1 + m.floor(hi * u)))
+      for (var i = 0; i < bases.length; i++)
+        for (var j = 0; j < js.length; j++)
+          if (js[j] % bases[i] == 0) return js[j] / u
+      return js[0] / u
+    }
+    function floor(x, n) { n = n || 1; return n * Math.floor(x / n) }
+    function ceil(x, n)  { n = n || 1; return n * Math.ceil(x / n) }
+    function round(x, n) { n = n || 1; return n * Math.round(x / n) }
+    function simplestSubdivisionsBetween(lo, hi, minCount, bases) {
+      minCount = minCount || 4
+      bases = bases || [10, 5, 2.5, 2]
+      var m = Math
+      var u = m.pow(10, -magnitude(hi - lo))
+      for (;; u *= 10) {
+        for (var i = 0; i < bases.length; i++) {
+          var b = bases[i]
+          var c0 = m.ceil(lo * u / b)
+          var c1 = m.floor(hi * u / b)
+          if (c1 - c0 >= minCount - 1)
+            return _.map(_.range(b * c0, b * c1 + 1, b), function (x) { return x / u })
+        }
+      }
+    }
+    function clamp(x, lo, hi) { return x < lo ? lo : hi < x ? hi : x === x ? x : NaN }
+    function always(x) { return function () { return x }}
+    function repeat(n, x) { return _.map(_.range(n), always(x)) }
+    function conj(a, b) { return Array.prototype.concat.apply([], a, b) }
+    function mapcat(list, iterator, context) {
+      var r = []
+      if (context) {
+        for (var i = 0; i < list.length; i++)
+          Array.prototype.push.apply(r, context.iterator(list[i], i, list))
+      } else {
+        for (var i = 0; i < list.length; i++)
+          Array.prototype.push.apply(r, iterator(list[i], i, list))
+      }
+      return r
+    }
+    function scaleRange(lo, hi, factor) {
+      var increment = 0.5 * (factor - 1) * (hi - lo) || 0.5;
+      return [lo - increment, hi + increment];
+    }
+    function toTimestamp(str) { return new Date(str).getTime() / 1000 }
+    function Freq(xs, opts) {
+      opts = opts || {}
+      var r = {}
+      r.width = opts.width || 800
+      r.height = opts.height || 400
+      r.xs = xs
+      r.xRange = opts.xRange || scaleRange(d3.min(xs), d3.max(xs), 1.1)
+      r.yRange = opts.yRange || scaleRange(0, 0.5 * xs.length, 1.2)
+      r.xSpan = r.xRange[1] - r.xRange[0]
+      r.ySpan = r.yRange[1] - r.yRange[0]
+      r.xFromAxis = function (x) { return this.width * (x - this.xRange[0]) / this.xSpan }
+      r.yFromAxis = function (y) { return this.height * (1 - (y - this.yRange[0]) / this.ySpan) }
+      r.fromAxis = function (p) { return { x: this.xFromAxis(p.x), y: this.yFromAxis(p.y) } }
+      r.xToAxis = function (x) { return this.xRange[0] + this.xSpan * (x / this.width) }
+      r.yToAxis = function (y) { return this.yRange[0] + this.ySpan * (1 - y / this.height) }
+      r.toAxis = function (p) { return { x: this.xToAxis(p.x), y: this.yToAxis(p.y) } }
+      r.maxDelta = (r.xRange[1] - r.xRange[0]) * 0.1;
+      // var labels = opts.labels || xs;
+      r.steps = 400
+      r.conv = function (delta) {
+        return function (m) {
+          return d3.sum(r.xs, function (x) {
+            var d = (x - m) / delta
+            return Math.sqrt(r.maxDelta) * Math.exp(-0.5 * d * d) / Math.sqrt(delta)
+          })
+        }
+      }
+      r.freq = function (delta) {
+        var conv = r.conv(delta)
+        return _.map(_.range(r.steps + 1), function (i) {
+          var m = r.xRange[0] + r.xSpan * i / r.steps
+          return { x: m, y: conv(m) }
+        })
+      }
+      r.area = d3.svg.area()
+        .x(function (d) { return r.xFromAxis(d.x) })
+        .y0(function (d) { return r.yFromAxis(0) })
+        .y1(function (d) { return r.yFromAxis(d.y) })
+      r.vis = d3.select("#chart")
+        .style({ margin: "20px auto", width: r.width + "px" })
+        .append("svg")
+          .attr({ width: r.width, height: r.height })
+          .style({ background: "white", margin: "0 auto" })
+      r.path = r.vis.selectAll("path")
+      r.data = r.path.data([r.freq(r.maxDelta * 0.25)])
+          .enter().append("path")
+            .attr("d", r.area)
+            .style({ fill: "rgba(0,0,0, 0.05)" })
+      d3.select("#chart").on("mousemove", function () {
+        var coord = d3.svg.mouse(this)
+        var a = clamp(1.2 * (1 - coord[1] / r.height) - 0.1, 0.01, 1)
+        r.vis.selectAll("path")
+          .data([r.freq(a * r.maxDelta)])
+          .attr("d", r.area)
+      })
+      return r
+    }
+    (function ($) {
+      $.getJSON("./guests.2012.json", null, function (data) {
+        window.data = data
+        var times = mapcat(data, function (x) {
+          return repeat(x.guests, toTimestamp(x.timestamp))
+        })
+        window.chart = Freq(times, {
+          xRange: scaleRange(d3.min(times), d3.max(times), 1.2),
+          maxDelta: 30 * 60
+        })
+      })
+    }(jQuery));
+  </script>
+  <!-- end scripts-->
+  <!--[if lt IE 7 ]>
+    <script src="js/libs/dd_belatedpng.js"></script>
+    <script>DD_belatedPNG.fix("img, .png_bg"); // http://goo.gl/mZiyb </script>
+  <![endif]-->
+  <!-- <script> // TODO: Change UA-XXXXX-X below
+    var _gaq=[["_setAccount","UA-XXXXX-X"],["_trackPageview"]];(function(d,t){
+    var g=d.createElement(t),s=d.getElementsByTagName(t)[0];g.async=1;g.src=(
+    "https:"==location.protocol?"//ssl":"//www")+".google-analytics.com/ga.js";
+    s.parentNode.insertBefore(g,s)}(document,"script"));
+  </script> -->
+</body>
+</html>
