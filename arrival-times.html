@@ -21,6 +21,7 @@
 
 <style>
   body { background: #fcfcfc }
+  span { font-weight: bold }
 </style>
 
 <body>
@@ -28,8 +29,9 @@
     <header>
 
     </header>
-    <div id="main" role="main">
+    <div id="main" role="main" style="width: 800px; margin: 0 auto">
       <div id="chart"></div>
+      <p><span id="guests">___</span> guests between <span id="time-0">___</span> and <span id="time-1">___</span>.</p>
     </div>
     <footer>
 
@@ -83,6 +85,7 @@
         }
       }
     }
+    function isBetween(lo, hi) { return function (x) { return lo <= x && x <= hi }}
     function clamp(x, lo, hi) { return x < lo ? lo : hi < x ? hi : x === x ? x : NaN }
     function always(x) { return function () { return x }}
     function repeat(n, x) { return _.map(_.range(n), always(x)) }
@@ -101,6 +104,12 @@
     function scaleRange(lo, hi, factor) {
       var increment = 0.5 * (factor - 1) * (hi - lo) || 0.5;
       return [lo - increment, hi + increment];
+    }
+    function getHours(ts) { return new Date(ts * 1000).getHours() }
+    function getMinutes(ts) { return new Date(ts * 1000).getMinutes() }
+    function hhmm(ts) {
+      var h = getHours(ts), m = getMinutes(ts)
+      return [h < 10 ? '0' + h : h, m < 10 ? '0' + m : m].join(':')
     }
     function toTimestamp(str) { return new Date(str).getTime() / 1000 }
     function Freq(xs, opts) {
@@ -153,10 +162,16 @@
             .style({ fill: "rgba(0,0,0, 0.05)" })
       d3.select("#chart").on("mousemove", function () {
         var coord = d3.svg.mouse(this)
+        var m = r.xToAxis(coord[0])
         var a = clamp(1.2 * (1 - coord[1] / r.height) - 0.1, 0.01, 1)
+        var d = a * r.maxDelta;
         r.vis.selectAll("path")
-          .data([r.freq(a * r.maxDelta)])
+          .data([r.freq(d)])
           .attr("d", r.area)
+        $("#guests").text(d3.sum(r.xs, isBetween(m - d, m + d)))
+        // $("#time").text(hhmm(simplestValueBetween(m - d, m + d)))
+        $("#time-0").text(hhmm(m - d))
+        $("#time-1").text(hhmm(m + d))
       })
       return r
     }
