@@ -13,19 +13,28 @@
 <style>
   * { font-family: "Optima", "Lucida Grande", sans-serif }
   body { background: #fcfcfc }
-  span { font-weight: bold }
+  #container { width: 800px; margin: 0 auto }
+  h1 { margin: 0 }
+  h1 span { font-weight: normal }
+  #chart .time-label { position: absolute; bottom: 0; padding: 0.5em 0 }
+  #chart .guests-label { position: absolute; padding: 0.5em 0 }
+  #chart .time-label .value,
+  #chart .guests-label .value,
+  #chart .chart-label .value { font-weight: bold }
 </style>
 
 <body>
   <div id="container">
     <header>
-
+      <h1>Futubileet 2012: <span>When did the guests arrive?</span><h1>
     </header>
     <div id="main" role="main" style="width: 800px; margin: 0 auto">
-      <div id="chart" style="position: relative">
+      <div id="chart" style="position: relative; width: 800px; height: 400px">
         <div style="color: #eee; position: absolute; right: 0; padding: 0.5em">© Pyry Jahkola, 2012</div>
-        <p style="position: absolute; bottom: 0; left: 50%; padding: 0.5em; margin: 0 0 0 -150px; width: 300px; text-align: center">
-          <span id="guests">___</span> guests at <span id="time">___</span> ± <span id="time-delta">___</span>
+        <div class="guests-label" style="display: none"><span class="value">___</span> <span class="unit">guests</span></div>
+        <div class="time-label" style="display: none"><span class="value">___</span> ± <span class="delta">___</span></div>
+        <p class="chart-label" style="position: absolute; bottom: 0; left: 0; padding: 0.5em; margin: 0; width: 100%; text-align: center">
+          In total, <span class="value">___</span> guests arrived between <span class="first-value">___</span> and <span class="last-value">___</span>.
         </p>
       </div>
     </div>
@@ -112,7 +121,13 @@
       var h = getHours(ts), m = getMinutes(ts)
       return [h < 10 ? '0' + h : h, m < 10 ? '0' + m : m].join(':')
     }
-    function toTimestamp(str) { return new Date(str.replace(/ /g, 'T')).getTime() / 1000 }
+    function toTimestamp(str) { return new Date(str.replace(/ /g, 'T') + 'Z').getTime() / 1000 - 3 * 3600}
+    function inflect(n, singular, plural) {
+      return n === 1 ? singular : plural ? plural : singular + 's'
+    }
+    function pluralize(n, singular, plural) {
+      return n + ' ' + inflect(n, singular, plural)
+    }
     function Freq(xs, opts) {
       opts = opts || {}
       var r = {}
@@ -120,7 +135,7 @@
       r.height = opts.height || 400
       r.xs = xs
       r.xRange = opts.xRange || scaleRange(d3.min(xs), d3.max(xs), 1.1)
-      r.yRange = opts.yRange || scaleRange(0, 0.5 * xs.length, 1.2)
+      r.yRange = opts.yRange || scaleRange(0, 0.5 * xs.length, 1.5)
       r.xSpan = r.xRange[1] - r.xRange[0]
       r.ySpan = r.yRange[1] - r.yRange[0]
       r.xFromAxis = function (x) { return this.width * (x - this.xRange[0]) / this.xSpan }
@@ -129,14 +144,14 @@
       r.xToAxis = function (x) { return this.xRange[0] + this.xSpan * (x / this.width) }
       r.yToAxis = function (y) { return this.yRange[0] + this.ySpan * (1 - y / this.height) }
       r.toAxis = function (p) { return { x: this.xToAxis(p.x), y: this.yToAxis(p.y) } }
-      r.maxDelta = (r.xRange[1] - r.xRange[0]) * 0.1;
+      r.maxDelta = opts.maxDelta || (r.xRange[1] - r.xRange[0]) * 0.1;
       // var labels = opts.labels || xs;
       r.steps = 400
       r.conv = function (delta) {
         return function (m) {
           return d3.sum(r.xs, function (x) {
-            var d = (x - m) / delta
-            return Math.sqrt(r.maxDelta) * Math.exp(-0.5 * d * d) / Math.sqrt(delta)
+            var d = 2 * (x - m) / delta
+            return 2 * Math.sqrt(r.maxDelta) * Math.exp(-0.5 * d * d) / Math.sqrt(delta)
           })
         }
       }
@@ -156,24 +171,76 @@
         .append("svg")
           .attr({ width: r.width, height: r.height })
           .style({ background: "white", margin: "0 auto", cursor: "crosshair" })
-      r.path = r.vis.selectAll("path")
+      r.path = r.vis.selectAll("path.freq")
       r.data = r.path.data([r.freq(r.maxDelta * 0.25)])
           .enter().append("path")
+            .attr("class", "freq")
             .attr("d", r.area)
             .style({ fill: "rgba(0,0,0, 0.3)" })
-      r.vis.on("mousemove", function () {
-        var coord = d3.svg.mouse(this)
+      r.vis.selectAll("path.grid")
+        .data(_.uniq(_.map(xs, function (x) { return round(x, 3600) })))
+        .enter().append("path")
+          .style("stroke", "white")
+          .attr("class", "grid")
+          .attr("d", function (x) {
+            return "M" + r.xFromAxis(x) + " 0 V" + r.yFromAxis(0) + " Z"
+          })
+      r.chart = $("#chart")
+      $("#chart .chart-label")
+        .find(".value").text(xs.length).end()
+        .find(".first-value").text(hhmm(d3.min(xs))).end()
+        .find(".last-value").text(hhmm(d3.max(xs))).end()
+      var mousemove = function (e) {
+        var offset = $("#chart").offset()
+        var coord = [e.pageX - offset.left, e.pageY - offset.top]
         var m = r.xToAxis(coord[0])
         var a = clamp(1.2 * (1 - coord[1] / r.height) - 0.1, 0.01, 1)
         var d = 60 * approx(a * r.maxDelta / 60, 2);
-        r.vis.selectAll("path")
-          .data([r.freq(d)])
+        var xy = r.freq(d)
+        r.vis.selectAll("path.freq").data([xy]).attr("d", r.area)
+        var guestCount = d3.sum(r.xs, isBetween(m - d, m + d))
+        var timeLabel = r.chart.find(".time-label")
+        timeLabel.find(".value").text(hhmm(m)) // simplestValueBetween(m - d, m + d)))
+        timeLabel.find(".delta").text(round(d / 60) + " min")
+        var timeValueWidth = timeLabel.find(".value").width()
+        timeLabel.show().css({
+          left: clamp(coord[0] - 0.5 * timeValueWidth, 0, r.chart.width() - timeLabel.width()) + 'px'
+        })
+
+        r.vis.selectAll("path.selection")
+          .data([[ { x: m - d, y: r.yToAxis(0) },
+                   { x: m + d, y: r.yToAxis(0) }]])
+          .style({ fill: "rgba(255, 255, 255, 0.5)" })
           .attr("d", r.area)
-        $("#guests").text(d3.sum(r.xs, isBetween(m - d, m + d)))
-        $("#time").text(hhmm(m)) // simplestValueBetween(m - d, m + d)))
-        $("#time-delta").text(round(d / 60) + " min")
-        $("#time-0").text(hhmm(m - d))
-        $("#time-1").text(hhmm(m + d))
+          .enter().append("path")
+          .attr("class", "selection")
+        
+        var guestsLabel = r.chart.find(".guests-label")
+        guestsLabel.find(".value").text(guestCount)
+        guestsLabel.find(".unit").text(inflect(guestCount, "guest"))
+        var guestsLabelX = clamp(coord[0] - 0.5 * guestsLabel.find(".value").width(), 0, r.chart.width() - guestsLabel.width())
+        var neighborhoodX0 = r.xToAxis(guestsLabelX)
+        var neighborhoodX1 = r.xToAxis(guestsLabelX + guestsLabel.width())
+        var neighborhood = _.filter(xy, function (x) {
+          return neighborhoodX0 <= x.x && x.x <= neighborhoodX1
+        })
+        guestsLabel.show().css({
+          left: guestsLabelX + 'px',
+          top: Math.max(0, r.yFromAxis(d3.max(_.pluck(neighborhood, 'y'))) - guestsLabel.height() - 15)
+        })
+        
+        r.chart.find(".chart-label").hide()
+      }
+      $("#chart, #chart *").mousemove(mousemove)
+      // r.vis.on("mousemove", mousemove)
+      r.chart.mouseleave(function () {
+        r.chart.find(".time-label").hide()
+        r.chart.find(".guests-label").hide()
+        r.chart.find(".chart-label").show()
+        r.vis.selectAll("path.freq")
+          .data([r.freq(r.maxDelta * 0.25)])
+          .attr("d", r.area)
+        r.vis.selectAll("path.selection").remove()
       })
       return r
     }
@@ -185,7 +252,8 @@
         })
         window.chart = Freq(times, {
           xRange: scaleRange(d3.min(times), d3.max(times), 1.2),
-          maxDelta: 30 * 60
+          yRange: [-30, 400],
+          maxDelta: 60 * 60
         })
       })
     }(jQuery));
