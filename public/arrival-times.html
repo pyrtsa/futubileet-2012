@@ -13,24 +13,29 @@
 <style>
   * { font-family: "Optima", "Lucida Grande", sans-serif }
   body { background: #fcfcfc }
-  #container { width: 800px; margin: 0 auto }
-  h1 { margin: 0.5em 0 0 }
+  #container { width: 800px; margin: 0 auto; color: #222 }
+  h1 { color: #333; margin: 0.5em 0 0 }
+  h1 a:link, .copyright a:visited { color: #333; text-decoration: none }
+  h1 a:hover, .copyright a:active { color: #22e; text-decoration: none }
   h1 span { font-weight: normal }
   #chart .time-label { position: absolute; bottom: 0; padding: 0.5em 0 }
   #chart .guests-label { position: absolute; padding: 0.5em 0 }
   #chart .time-label .value,
   #chart .guests-label .value,
   #chart .chart-label .value { font-weight: bold }
+  .copyright { color: #eee; position: absolute; right: 0; padding: 0.5em }
+  .copyright a:link, .copyright a:visited { color: #eee; text-decoration: none }
+  .copyright a:hover, .copyright a:active { color: #22e; text-decoration: none }
 </style>
 
 <body>
   <div id="container">
     <header>
-      <h1>Futubileet 2012: <span>When did guests arrive?</span><h1>
+      <h1><a href="http://futurice.com/">Futu</a>bileet 2012: <span>When did guests arrive?</span><h1>
     </header>
     <div id="main" role="main" style="width: 800px; margin: 0 auto">
       <div id="chart" style="position: relative; width: 800px; height: 400px">
-        <div style="color: #eee; position: absolute; right: 0; padding: 0.5em">© Pyry Jahkola, 2012</div>
+        <div class="copyright"><a href="https://twitter.com/pyrtsa">© Pyry Jahkola, 2012</a></div>
         <div class="guests-label" style="display: none"><span class="value">___</span> <span class="unit">guests</span></div>
         <div class="time-label" style="display: none"><span class="value">___</span> ± <span class="delta">___</span></div>
         <p class="chart-label" style="position: absolute; bottom: 0; left: 0; padding: 0.5em; margin: 0; width: 100%; text-align: center">
