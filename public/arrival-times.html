@@ -11,6 +11,7 @@
 </head>
 
 <style>
+  * { font-family: "Optima", "Lucida Grande", sans-serif }
   body { background: #fcfcfc }
   span { font-weight: bold }
 </style>
@@ -110,7 +111,7 @@
       var h = getHours(ts), m = getMinutes(ts)
       return [h < 10 ? '0' + h : h, m < 10 ? '0' + m : m].join(':')
     }
-    function toTimestamp(str) { return new Date(str).getTime() / 1000 }
+    function toTimestamp(str) { return new Date(str.replace(/ /g, 'T')).getTime() / 1000 }
     function Freq(xs, opts) {
       opts = opts || {}
       var r = {}
