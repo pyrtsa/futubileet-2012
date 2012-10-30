@@ -22,11 +22,12 @@
 
     </header>
     <div id="main" role="main" style="width: 800px; margin: 0 auto">
-      <div id="chart"></div>
-      <p>
-        <span id="guests">___</span> guests at <span id="time">___</span> ± <span id="time-delta">___</span>
-        <!-- (between <span id="time-0">___</span> and <span id="time-1">___</span>). -->
-      </p>
+      <div id="chart" style="position: relative">
+        <div style="color: #eee; position: absolute; right: 0; padding: 0.5em">© Pyry Jahkola, 2012</div>
+        <p style="position: absolute; bottom: 0; left: 50%; padding: 0.5em; margin: 0 0 0 -150px; width: 300px; text-align: center">
+          <span id="guests">___</span> guests at <span id="time">___</span> ± <span id="time-delta">___</span>
+        </p>
+      </div>
     </div>
     <footer>
 
@@ -160,7 +161,7 @@
           .enter().append("path")
             .attr("d", r.area)
             .style({ fill: "rgba(0,0,0, 0.3)" })
-      d3.select("#chart").on("mousemove", function () {
+      r.vis.on("mousemove", function () {
         var coord = d3.svg.mouse(this)
         var m = r.xToAxis(coord[0])
         var a = clamp(1.2 * (1 - coord[1] / r.height) - 0.1, 0.01, 1)
